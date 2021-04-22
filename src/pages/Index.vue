@@ -149,7 +149,7 @@ export default {
       audio: {
         sources: [
           {
-            src: 'http://192.168.100.235:8888/pc.ogg',
+            src: 'http://192.168.100.235:8888/stellara.ogg',
             type: 'audio/ogg'
           }
         ]
@@ -221,7 +221,7 @@ export default {
     },
     async updateSmeter () {
       try {
-        const result = await this.$axios.get('control/smeter')
+        const result = await this.$axios.get('/control/smeter')
         if (result.data.success) {
           this.smeterlevel = result.data.scale.smeter
         } else {
@@ -234,7 +234,7 @@ export default {
     async sendFreqRadio () {
       const deb = lodash.debounce(async () => {
         try {
-          const result = await this.$axios.post('control/frequency',
+          const result = await this.$axios.post('/control/frequency',
             {
               frequency: this.frequency * 1000
             })
@@ -244,12 +244,12 @@ export default {
         } catch (error) {
           console.error(error)
         }
-      }, 2000)
+      }, 1000)
       deb()
     },
     async sendModRadio () {
       try {
-        const result = await this.$axios.post('control/modulation',
+        const result = await this.$axios.post('/control/modulation',
           {
             mode: this.modulation.value,
             bandwidth: this.bandwidth.value
@@ -265,7 +265,7 @@ export default {
   async mounted () {
     setInterval(() => {
       this.updateSmeter()
-    }, 2000)
+    }, 1000)
     await this.sendFreqRadio()
     await this.sendModRadio()
   },
