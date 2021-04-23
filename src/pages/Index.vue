@@ -6,6 +6,16 @@
       class="q-pa-md column items-start flex flex-center display"
     )
       q-card(
+        class="player"
+      )
+        q-card-section
+          q-media-player(
+            type="audio"
+            background-color="purple"
+            radius="1rem"
+            :sources="audio.sources"
+          )
+      q-card(
         class="frequency"
       )
         q-card-section
@@ -69,16 +79,6 @@
               @click.prevent="decreaseFreq"
             )
       q-card(
-        class="player"
-      )
-        q-card-section
-          q-media-player(
-            type="audio"
-            background-color="purple"
-            radius="1rem"
-            :sources="audio.sources"
-          )
-      q-card(
         class="modulation"
       )
         q-card-section
@@ -115,6 +115,48 @@
              q-icon(
                name="settings_ethernet"
              )
+      q-card(
+        class="scanning"
+      )
+        q-card-section
+          div(
+            class="text-h6"
+          ) Strong frequencies
+        q-separator
+        q-card-section
+          q-list(
+            bordered
+            v-if="top10freqs.length > 0"
+          )
+            q-item(
+              clickable v-ripple
+              v-for="freq in top10freqs"
+              :key="freq.freq"
+              @click.prevent="listenTopFreq(freq.freq)"
+            )
+              q-item-section(
+                avatar
+              )
+                q-icon(
+                  color="primary"
+                  name="sensors"
+                )
+              q-item-section {{ freq.freq }}
+          div(
+            class="text-h7"
+            v-if="top10freqs.length == 0"
+          ) Oops, no frequencies scanned
+        q-card-actions(
+         class="flex flex-center column"
+        )
+          q-btn(
+             class="frequency-btn"
+             rounded
+             glossy
+             icon="search"
+             color="purple"
+             @click.prevent="scanFreqs"
+           )
 </template>
 <style scoped>
 .smeter {
@@ -137,6 +179,10 @@
   margin: 20px 20px 0px 0px;
   width: 64px;
   height: 64px
+}
+.scanning {
+  width: 100%;
+  margin: 0px 0px 10px 0px;
 }
 </style>
 <script>
@@ -194,7 +240,8 @@ export default {
         { label: 'Narrow', value: 'narrow' },
         { label: 'Normal', value: 'normal' },
         { label: 'Wide', value: 'wide' }
-      ]
+      ],
+      top10freqs: []
     }
   },
   methods: {
@@ -227,6 +274,24 @@ export default {
         } else {
           console.error(result.data)
         }
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    async listenTopFreq (freq) {
+      this.frequency = parseFloat(freq).toFixed(2)
+    },
+    async scanFreqs () {
+      try {
+        const mhz = Math.round(parseFloat(this.frequency) / 1000)
+        this.top10freqs = []
+        const result = await this.$axios.get(`/control/scan/${mhz}`)
+        if (result.data.success) {
+          this.top10freqs = result.data.frequencies
+        } else {
+          console.error(result.data)
+        }
+        await this.sendFreqRadio()
       } catch (error) {
         console.error(error)
       }
@@ -265,7 +330,7 @@ export default {
   async mounted () {
     setInterval(() => {
       this.updateSmeter()
-    }, 1000)
+    }, 2000)
     await this.sendFreqRadio()
     await this.sendModRadio()
   },
