@@ -1,6 +1,6 @@
 {
   "name": "stellara-frontend",
-  "version": "0.0.1",
+  "version": "0.2.0",
   "description": "A radio frontend for Stellara SDR Station",
   "productName": "Stellara",
   "author": "Cleverson S A",

@@ -6,6 +6,30 @@
       class="q-pa-md column items-start flex flex-center display"
     )
       q-card(
+        class="mode"
+      )
+        q-card-actions(
+         class="flex flex-center row"
+        )
+          q-btn(
+             class="mode-btn"
+             rounded
+             glossy
+             color="purple"
+             label="Shortwave"
+             :disable="(mode == 'hf')? true: false"
+             @click.prevent="swapMode"
+           )
+          q-btn(
+             class="mode-btn"
+             rounded
+             glossy
+             color="purple"
+             label="Vhf"
+             :disable="(mode == 'vhf')? true: false"
+             @click.prevent="swapMode"
+           )
+      q-card(
         class="player"
       )
         q-card-section
@@ -175,9 +199,17 @@
   width: 100%;
   margin: 0px 0px 10px 0px;
 }
+.mode {
+  width: 100%;
+  margin: 0px 0px 10px 0px;
+}
 .frequency-btn {
   margin: 20px 20px 0px 0px;
   width: 64px;
+  height: 64px
+}
+.mode-btn {
+  width: 128px;
   height: 64px
 }
 .scanning {
@@ -192,6 +224,9 @@ export default {
   name: 'PageIndex',
   data () {
     return {
+      smeterHandler: undefined,
+      freqHandler: undefined,
+      mode: 'hf',
       audio: {
         sources: [
           {
@@ -210,7 +245,7 @@ export default {
         { label: '100 hz', value: 0.100 },
         { label: '10 hz', value: 0.01 }
       ],
-      frequency: 7200.86,
+      frequency: 7023,
       smeterlevel: 'S6',
       smeter: {
         S1: 0.1,
@@ -254,7 +289,9 @@ export default {
     },
     increaseFreq () {
       this.frequency = parseFloat(this.frequency) + parseFloat(this.freq_step)
-      if (this.frequency >= 30000) {
+      if (this.frequency >= 24000 && this.mode === 'hf') {
+        this.frequency = 100
+      } else if (this.frequency >= 2400000 && this.mode === 'vhf') {
         this.frequency = 100
       }
       this.frequency = parseFloat(this.frequency).toFixed(2)
@@ -262,9 +299,65 @@ export default {
     decreaseFreq () {
       this.frequency = parseFloat(this.frequency) - parseFloat(this.freq_step)
       if (this.frequency <= 0) {
-        this.frequency = 30000
+        this.frequency = 24000
       }
       this.frequency = parseFloat(this.frequency).toFixed(2)
+    },
+    startTimers () {
+      /* this.freqHandler = setInterval(() => {
+        this.syncFreq()
+      }, 5000) */
+      this.smeterHandler = setInterval(() => {
+        this.updateSmeter()
+      }, 2000)
+    },
+    async syncFreq () {
+      try {
+        const result = await this.$axios.get('/control/frequency')
+        if (result.data.success) {
+          this.frequency = (parseFloat(result.data.frequency) / 1000).toFixed(2)
+        } else {
+          console.error(result.data)
+        }
+      } catch (error) {
+        console.error(error)
+      }
+    },
+    stopTimers () {
+      clearInterval(this.smeterHandler)
+      // clearInterval(this.freqHandler)
+    },
+    async swapMode () {
+      this.$q.loading.show({
+        message: 'Changing GQRX profile, please wait 30s for be ready again<br/><span class="text-orange text-weight-bold">Hang on...</span>'
+      })
+
+      if (this.mode === 'vhf') {
+        this.mode = 'hf'
+      } else if (this.mode === 'hf') {
+        this.mode = 'vhf'
+      }
+      this.stopTimers()
+      try {
+        const result = await this.$axios.post('/control/swap', {
+          mode: this.mode
+        })
+        if (result.data.success) {
+          setTimeout(async () => {
+            this.$q.loading.hide()
+            this.startTimers()
+            if (this.mode === 'hf') {
+              this.frequency = 7023
+            } else if (this.mode === 'vhf') {
+              this.frequency = 28074
+            }
+          }, 30000)
+        } else {
+          console.error(result.data)
+        }
+      } catch (error) {
+        console.error(error)
+      }
     },
     async updateSmeter () {
       try {
@@ -282,16 +375,22 @@ export default {
       this.frequency = parseFloat(freq).toFixed(2)
     },
     async scanFreqs () {
+      this.$q.loading.show({
+        message: 'Scanning frequencies, please wait about 30s to complete Mhz verification<br/><span class="text-orange text-weight-bold">Hang on...</span>'
+      })
+      this.stopTimers()
       try {
         const mhz = Math.round(parseFloat(this.frequency) / 1000)
         this.top10freqs = []
         const result = await this.$axios.get(`/control/scan/${mhz}`)
+        this.$q.loading.hide()
         if (result.data.success) {
           this.top10freqs = result.data.frequencies
         } else {
           console.error(result.data)
         }
         await this.sendFreqRadio()
+        this.startTimers()
       } catch (error) {
         console.error(error)
       }
@@ -328,9 +427,12 @@ export default {
     }
   },
   async mounted () {
-    setInterval(() => {
+    this.smeterHandler = setInterval(() => {
       this.updateSmeter()
     }, 2000)
+    /* this.freqHandler = setInterval(() => {
+      this.syncFreq()
+    }, 5000) */
     await this.sendFreqRadio()
     await this.sendModRadio()
   },
